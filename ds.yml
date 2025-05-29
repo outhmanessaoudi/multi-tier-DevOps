@@ -1,8 +1,20 @@
+# MySql Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-credentials
+  namespace: webapps
+type: Opaque
+data:
+  mysql-root-password: VGVzdEAxMjM= # Base64 de "Test@123"
+  mysql-database: YmFua2FwcGRi # Base64 de "bankappdb"
+---
 # MySql Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mysql
+  namespace: webapps
 spec:
   selector:
     matchLabels:
@@ -16,35 +28,51 @@ spec:
     spec:
       restartPolicy: Always
       containers:
-      - image: mysql:8
+      - image: mysql:8.0
         name: mysql
         env:
         - name: MYSQL_ROOT_PASSWORD
-          value: "Test@123"
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: mysql-root-password
         - name: MYSQL_DATABASE
-          value: "bankappdb"
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: mysql-database
         ports:
         - containerPort: 3306
           name: mysql
+        readinessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 30
+          periodSeconds: 10
 ---
-
 # MySql Service
 apiVersion: v1
 kind: Service
 metadata:
   name: mysql-service
+  namespace: webapps
 spec:
   ports:
   - port: 3306
   selector:
     app: mysql
 ---
-
 # Java Application Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: bankapp
+  namespace: webapps
 spec:
   replicas: 1
   selector:
@@ -63,18 +91,33 @@ spec:
         - containerPort: 8080
         env:
         - name: SPRING_DATASOURCE_URL
-          value: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+          value: jdbc:mysql://mysql-service.webapps.svc.cluster.local:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
         - name: SPRING_DATASOURCE_USERNAME
           value: root
         - name: SPRING_DATASOURCE_PASSWORD
-          value: Test@123
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: mysql-root-password
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 10
 ---
-
 # Bank Application Service
 apiVersion: v1
 kind: Service
 metadata:
   name: bankapp-service
+  namespace: webapps
 spec:
   type: LoadBalancer
   ports:
