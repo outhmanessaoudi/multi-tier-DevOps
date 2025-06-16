@@ -13,46 +13,46 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mysql
+  name: bankapp
   namespace: webapps
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      app: mysql
-  strategy:
-    type: Recreate
+      app: bankapp
   template:
     metadata:
       labels:
-        app: mysql
+        app: bankapp
     spec:
       restartPolicy: Always
       containers:
-      - image: mysql:8.0
-        name: mysql
+      - name: bankapp
+        image: outhmanessaoudi/bankapp:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
         env:
-        - name: MYSQL_ROOT_PASSWORD
+        - name: SPRING_DATASOURCE_URL
+          value: jdbc:mysql://mysql-service.webapps.svc.cluster.local:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+        - name: SPRING_DATASOURCE_USERNAME
+          value: root
+        - name: SPRING_DATASOURCE_PASSWORD
           valueFrom:
             secretKeyRef:
               name: mysql-credentials
               key: mysql-root-password
-        - name: MYSQL_DATABASE
-          valueFrom:
-            secretKeyRef:
-              name: mysql-credentials
-              key: mysql-database
-        ports:
-        - containerPort: 3306
-          name: mysql
         readinessProbe:
-          tcpSocket:
-            port: 3306
-          initialDelaySeconds: 15
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30
           periodSeconds: 10
         livenessProbe:
-          tcpSocket:
-            port: 3306
-          initialDelaySeconds: 30
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 60
           periodSeconds: 10
 ---
 # MySql Service
