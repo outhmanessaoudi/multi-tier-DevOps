@@ -86,7 +86,9 @@ spec:
       restartPolicy: Always
       containers:
       - name: bankapp
-        image: adijaiswal/bankapp:latest
+        # image: adijaiswal/bankapp:latest
+        image: outhmanessaoudi/bankapp:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
         env:
